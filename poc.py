@@ -161,6 +161,13 @@ def main():
     session = load_session(args.weights_dir, styles[current_style_idx])
     input_name = session.get_inputs()[0].name
 
+    # Warmup: first CUDA inference compiles kernels and is very slow.
+    # Do it now so the display window doesn't freeze during init.
+    print("Warming up CUDA (first inference may take 10-30s)...", flush=True)
+    warmup_input = np.random.rand(1, 3, 4, 4).astype(np.float32) * 255
+    session.run(None, {input_name: warmup_input})
+    print("Ready!")
+
     print(f"Capturing monitor {args.monitor} at scale {scale:.1f}x")
     print(f"Styles: {', '.join(f'[{i+1}] {s}' for i, s in enumerate(styles))}")
     print("Press Q or ESC to quit.")
