@@ -164,7 +164,7 @@ def main():
     # Warmup: first CUDA inference compiles kernels and is very slow.
     # Do it now so the display window doesn't freeze during init.
     print("Warming up CUDA (first inference may take 10-30s)...", flush=True)
-    warmup_input = np.random.rand(1, 3, 4, 4).astype(np.float32) * 255
+    warmup_input = np.random.rand(1, 3, 64, 64).astype(np.float32) * 255
     session.run(None, {input_name: warmup_input})
     print("Ready!")
 
