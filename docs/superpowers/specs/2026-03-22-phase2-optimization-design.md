@@ -61,11 +61,23 @@ First run builds optimized TensorRT engines from the `.onnx` files (~30-60s per 
 
 `--fp16` CLI flag enables half-precision inference. TensorRT uses FP16 for most layers, roughly halving inference time with negligible quality loss for style transfer. The engine cache is precision-specific — FP16 and FP32 engines are separate cached files.
 
-Runtime toggle via `F` key rebuilds the session with the opposite precision (triggers engine build if not cached).
+Runtime toggle via `F` key rebuilds the session with the opposite precision. If the engine is not cached, the build takes ~30-60s and the UI will freeze during that time (accepted behavior for Phase 2 — the `build_engines.py` script exists to pre-build engines and avoid this). If the engine is cached, the rebuild takes 1-5s.
 
 ### Engine Build Script
 
-`build_engines.py` — pre-builds TensorRT engines for all styles at a configurable resolution. Optional convenience to avoid cold-start penalty on first run. Engines auto-build on first inference if not pre-built.
+`build_engines.py` — pre-builds TensorRT engines for all styles. Optional convenience to avoid cold-start penalty on first run. Engines auto-build on first inference if not pre-built.
+
+```
+python build_engines.py [options]
+
+Options:
+  --weights-dir PATH  ONNX model directory (default: ./weights)
+  --engine-dir PATH   Engine cache directory (default: ./engines)
+  --fp16              Build FP16 engines (default: FP32)
+  --both              Build both FP16 and FP32 engines
+```
+
+The script discovers all `.onnx` files via `discover_styles()` (imported from `pipeline.py`), creates the engine directory if needed, and runs a dummy inference per model to trigger engine compilation. Prints progress and timing for each build.
 
 ### Fallback Chain
 
@@ -89,12 +101,19 @@ class FrameGrabber:
                 with self.lock:
                     self.frame = grabbed
 
+    def start(self):
+        self.thread.start()
+
     def get_latest(self):
         with self.lock:
-            return self.frame
+            return self.frame.copy() if self.frame is not None else None
+
+    def stop(self):
+        self.running = False
 ```
 
 - **Daemon thread** — dies automatically when main thread exits, no orphan risk
+- **Frame copy** — `get_latest()` returns a copy to prevent the capture thread from mutating the array while the main thread processes it
 - **Latest-frame semantics** — no queue, no backpressure. Main thread always gets the most recent screen state
 - `grab()` returns `None` when screen hasn't changed — thread simply retries, lock is never held for long
 - Main loop calls `get_latest()` — if it returns `None` (no frame yet), skip that iteration
@@ -128,7 +147,7 @@ Options:
 Two-line HUD with per-step timing:
 
 ```
-Style: candy (TRT/FP16) | Scale: 0.5x (1720x720) | FPS: 120
+Style: candy (FP16) | Scale: 0.5x (1720x720) | FPS: 120
 Capture: 1.2ms | Pre: 0.8ms | Infer: 3.1ms | Post: 0.5ms | Display: 1.0ms
 ```
 
@@ -142,11 +161,20 @@ The per-step timing breakdown is the key Phase 2 deliverable — it tells you ex
 | `build_engines.py`| Create | Pre-build TensorRT engines for all styles          |
 | `.gitignore`      | Edit   | Add `engines/` directory                           |
 
-No changes to `poc.py`, `model.py`, or existing code. Reuses pure functions from `poc.py` (`preprocess`, `postprocess`, `round_to_mult4`, `discover_styles`) via import.
+Extract shared pure functions (`preprocess`, `postprocess`, `round_to_mult4`, `discover_styles`, `build_hud_text`) from `poc.py` into a new `pipeline.py` module. Update `poc.py` to import from `pipeline.py` instead of defining them inline. Both `poc.py` and `run.py` import from `pipeline.py`.
+
+| File              | Action | Purpose                                           |
+|-------------------|--------|---------------------------------------------------|
+| `pipeline.py`     | Create | Shared pure functions extracted from poc.py        |
+| `poc.py`          | Modify | Import from pipeline.py instead of inline defs     |
 
 ## Dependencies
 
-None new. `onnxruntime-gpu` 1.24.4 already includes `TensorrtExecutionProvider`.
+None new. `onnxruntime-gpu` 1.24.4 already includes `TensorrtExecutionProvider`. Pin `onnxruntime-gpu>=1.24.0` in `requirements.txt` to ensure TensorRT provider options are available.
+
+| File              | Action | Purpose                                           |
+|-------------------|--------|---------------------------------------------------|
+| `requirements.txt`| Modify | Pin `onnxruntime-gpu>=1.24.0`                     |
 
 ## Error Handling
 
