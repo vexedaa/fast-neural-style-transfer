@@ -8,27 +8,27 @@ import pytest
 
 
 def test_round_to_mult4_rounds_down():
-    from poc import round_to_mult4
+    from pipeline import round_to_mult4
     assert round_to_mult4(1081) == 1080
 
 
 def test_round_to_mult4_rounds_up():
-    from poc import round_to_mult4
+    from pipeline import round_to_mult4
     assert round_to_mult4(1082) == 1084
 
 
 def test_round_to_mult4_already_aligned():
-    from poc import round_to_mult4
+    from pipeline import round_to_mult4
     assert round_to_mult4(1080) == 1080
 
 
 def test_round_to_mult4_minimum():
-    from poc import round_to_mult4
+    from pipeline import round_to_mult4
     assert round_to_mult4(1) == 4
 
 
 def test_preprocess_shape_and_dtype():
-    from poc import preprocess
+    from pipeline import preprocess
     # Simulate a 100x200 BGR frame
     frame = np.random.randint(0, 256, (100, 200, 3), dtype=np.uint8)
     result = preprocess(frame, scale=1.0)
@@ -37,7 +37,7 @@ def test_preprocess_shape_and_dtype():
 
 
 def test_preprocess_scales_dimensions():
-    from poc import preprocess
+    from pipeline import preprocess
     frame = np.random.randint(0, 256, (100, 200, 3), dtype=np.uint8)
     result = preprocess(frame, scale=0.5)
     # 100*0.5=50 -> round_to_mult4(50)=52, 200*0.5=100 -> round_to_mult4(100)=100
@@ -45,7 +45,7 @@ def test_preprocess_scales_dimensions():
 
 
 def test_preprocess_rounds_to_mult4():
-    from poc import preprocess
+    from pipeline import preprocess
     # 110*0.5=55 -> round to 56, 210*0.5=105 -> round to 104
     frame = np.random.randint(0, 256, (110, 210, 3), dtype=np.uint8)
     result = preprocess(frame, scale=0.5)
@@ -55,7 +55,7 @@ def test_preprocess_rounds_to_mult4():
 
 
 def test_preprocess_value_range():
-    from poc import preprocess
+    from pipeline import preprocess
     frame = np.full((100, 200, 3), 128, dtype=np.uint8)
     result = preprocess(frame, scale=1.0)
     assert result.min() >= 0.0
@@ -63,7 +63,7 @@ def test_preprocess_value_range():
 
 
 def test_preprocess_bgr_to_rgb():
-    from poc import preprocess
+    from pipeline import preprocess
     # Frame with distinct BGR channels
     frame = np.zeros((4, 4, 3), dtype=np.uint8)
     frame[:, :, 0] = 10   # B
@@ -77,7 +77,7 @@ def test_preprocess_bgr_to_rgb():
 
 
 def test_postprocess_shape_and_dtype():
-    from poc import postprocess
+    from pipeline import postprocess
     # Simulate model output: (1, 3, 50, 100) float32
     output = np.random.rand(1, 3, 50, 100).astype(np.float32) * 255
     result = postprocess(output)
@@ -86,7 +86,7 @@ def test_postprocess_shape_and_dtype():
 
 
 def test_postprocess_clamps_values():
-    from poc import postprocess
+    from pipeline import postprocess
     output = np.array([[[[-10.0]], [[300.0]], [[128.0]]]],  dtype=np.float32)
     result = postprocess(output)
     # Input RGB channels: R=-10, G=300, B=128
@@ -98,7 +98,7 @@ def test_postprocess_clamps_values():
 
 
 def test_postprocess_rgb_to_bgr():
-    from poc import postprocess
+    from pipeline import postprocess
     output = np.zeros((1, 3, 1, 1), dtype=np.float32)
     output[0, 0, 0, 0] = 30.0   # R
     output[0, 1, 0, 0] = 20.0   # G
@@ -111,7 +111,7 @@ def test_postprocess_rgb_to_bgr():
 
 
 def test_discover_styles_finds_onnx_files():
-    from poc import discover_styles
+    from pipeline import discover_styles
     with tempfile.TemporaryDirectory() as tmpdir:
         for name in ["candy.onnx", "mosaic.onnx", "readme.txt"]:
             open(os.path.join(tmpdir, name), "w").close()
@@ -120,14 +120,14 @@ def test_discover_styles_finds_onnx_files():
 
 
 def test_discover_styles_empty_dir():
-    from poc import discover_styles
+    from pipeline import discover_styles
     with tempfile.TemporaryDirectory() as tmpdir:
         styles = discover_styles(tmpdir)
         assert styles == []
 
 
 def test_build_hud_text():
-    from poc import build_hud_text
+    from pipeline import build_hud_text
     text = build_hud_text("candy", 0.5, 1720, 720, 45.2, 4)
     assert "candy" in text
     assert "0.5x" in text
