@@ -190,6 +190,12 @@ def main():
     grabber = FrameGrabber(camera)
     grabber.start()
 
+    # Wait for the first frame before opening the window
+    print("Waiting for first frame...", flush=True)
+    while grabber.get_latest() is None:
+        time.sleep(0.01)
+    print("Got first frame!")
+
     print(f"Capturing monitor {args.monitor} at scale {scale:.1f}x")
     print(f"Styles: {', '.join(f'[{i+1}] {s}' for i, s in enumerate(styles))}")
     print(f"Precision: {'FP16' if fp16 else 'FP32'}")
