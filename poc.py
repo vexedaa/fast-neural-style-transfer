@@ -171,64 +171,66 @@ def main():
     fps = 0.0
     prev_time = time.perf_counter()
 
-    while True:
-        frame = camera.grab()
-        if frame is None:
-            # Screen unchanged, keep displaying last frame
+    try:
+        while True:
+            frame = camera.grab()
+            if frame is None:
+                # Screen unchanged, keep displaying last frame
+                key = cv2.waitKey(1) & 0xFF
+                if key in (ord("q"), 27):
+                    break
+                continue
+
+            # Preprocess
+            input_tensor = preprocess(frame, scale)
+            _, _, inf_h, inf_w = input_tensor.shape
+
+            # Inference
+            ort_inputs = {input_name: input_tensor}
+            ort_outputs = session.run(None, ort_inputs)
+
+            # Postprocess
+            stylized = postprocess(ort_outputs[0])
+
+            # FPS calculation
+            current_time = time.perf_counter()
+            dt = current_time - prev_time
+            prev_time = current_time
+            fps = 0.9 * fps + 0.1 * (1.0 / dt) if dt > 0 else fps
+
+            # HUD
+            hud_text = build_hud_text(styles[current_style_idx], scale, inf_w, inf_h, fps, len(styles))
+            draw_hud(stylized, hud_text)
+
+            cv2.imshow(window_name, stylized)
+
+            # Key handling
             key = cv2.waitKey(1) & 0xFF
-            if key in (ord("q"), 27):
+
+            if key in (ord("q"), 27):  # Q or ESC
                 break
-            continue
 
-        # Preprocess
-        input_tensor = preprocess(frame, scale)
-        _, _, inf_h, inf_w = input_tensor.shape
+            # Style swap: keys 1-9
+            if ord("1") <= key <= ord("9"):
+                idx = key - ord("1")
+                if idx < len(styles) and idx != current_style_idx:
+                    current_style_idx = idx
+                    print(f"Switching to '{styles[current_style_idx]}'...")
+                    session = load_session(args.weights_dir, styles[current_style_idx])
+                    input_name = session.get_inputs()[0].name
 
-        # Inference
-        ort_inputs = {input_name: input_tensor}
-        ort_outputs = session.run(None, ort_inputs)
-
-        # Postprocess
-        stylized = postprocess(ort_outputs[0])
-
-        # FPS calculation
-        current_time = time.perf_counter()
-        dt = current_time - prev_time
-        prev_time = current_time
-        fps = 0.9 * fps + 0.1 * (1.0 / dt) if dt > 0 else fps
-
-        # HUD
-        hud_text = build_hud_text(styles[current_style_idx], scale, inf_w, inf_h, fps, len(styles))
-        draw_hud(stylized, hud_text)
-
-        cv2.imshow(window_name, stylized)
-
-        # Key handling
-        key = cv2.waitKey(1) & 0xFF
-
-        if key in (ord("q"), 27):  # Q or ESC
-            break
-
-        # Style swap: keys 1-9
-        if ord("1") <= key <= ord("9"):
-            idx = key - ord("1")
-            if idx < len(styles) and idx != current_style_idx:
-                current_style_idx = idx
-                print(f"Switching to '{styles[current_style_idx]}'...")
-                session = load_session(args.weights_dir, styles[current_style_idx])
-                input_name = session.get_inputs()[0].name
-
-        # Scale adjust
-        if key in (ord("+"), ord("=")):
-            scale = min(1.0, round(scale + 0.1, 1))
-            print(f"Scale: {scale:.1f}x")
-        if key == ord("-"):
-            scale = max(0.1, round(scale - 0.1, 1))
-            print(f"Scale: {scale:.1f}x")
-
-    cv2.destroyAllWindows()
-    del camera
-    print("Done.")
+            # Scale adjust
+            if key in (ord("+"), ord("=")):
+                scale = min(1.0, round(scale + 0.1, 1))
+                print(f"Scale: {scale:.1f}x")
+            if key == ord("-"):
+                scale = max(0.1, round(scale - 0.1, 1))
+                print(f"Scale: {scale:.1f}x")
+    finally:
+        cv2.destroyAllWindows()
+        camera.release()
+        del camera
+        print("Done.")
 
 
 if __name__ == "__main__":
