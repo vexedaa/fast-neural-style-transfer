@@ -4,6 +4,8 @@ tqdm
 torch
 torchvision
 numpy
-onnxruntime
+onnxruntime-gpu
 
 flask
+dxcam
+onnx
