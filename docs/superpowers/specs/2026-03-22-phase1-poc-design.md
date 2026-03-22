@@ -61,14 +61,14 @@ Style: candy | Scale: 0.5x (1720x720) | FPS: 45 | [1-4] styles [+/-] scale [Q] q
 
 ### DXcam Capture
 
-- `dxcam.create(device_idx=0, output_idx=monitor)` to create capture device
+- `dxcam.create(device_idx=0, output_idx=monitor, output_color="BGR")` to create capture device — DXcam defaults to RGB, but we request BGR to match OpenCV's expected format
 - `camera.grab()` for single-frame pulls (not streaming mode)
 - Returns BGR numpy arrays `(H, W, 3)` — same format as OpenCV
-- If `grab()` returns `None` (screen unchanged), skip iteration
+- If `grab()` returns `None` (screen unchanged), skip iteration and retain the last displayed frame (OpenCV's `imshow` naturally holds the previous image)
 
 ### Preprocessing
 
-1. Resize frame by scale factor using OpenCV
+1. Resize frame by scale factor using OpenCV — round target dimensions to nearest multiple of 4 (the model uses stride-2 convolutions and 2x upsampling, so multiples of 4 avoid rounding artifacts)
 2. Convert BGR → RGB
 3. Transpose HWC → CHW
 4. Cast to float32 (values already in [0, 255] range)
@@ -93,14 +93,17 @@ Style: candy | Scale: 0.5x (1720x720) | FPS: 45 | [1-4] styles [+/-] scale [Q] q
 
 When `+`/`-` is pressed:
 - Clamp new scale to [0.1, 1.0]
-- The new scale applies on the next frame — no session reload needed since the ONNX model was exported with dynamic spatial dimensions (only batch axis is dynamic in the current export, but the model architecture is fully convolutional and handles arbitrary spatial dimensions)
+- The new scale applies on the next frame — no session reload needed since the model architecture is fully convolutional and handles arbitrary spatial dimensions
+
+**Note:** The shipped ONNX models have fixed spatial dimensions (1080x1080) with only the batch axis declared as dynamic. A one-time setup step is required to patch the ONNX files to declare dynamic spatial axes. This uses the `onnx` Python library to update the dimension declarations in-place — no `.pth` checkpoints needed.
 
 ## Files Changed
 
-| File               | Action | Purpose                     |
-|--------------------|--------|-----------------------------|
-| `poc.py`           | Create | Entire PoC script           |
-| `requirements.txt` | Edit   | Add `dxcam`                 |
+| File                   | Action | Purpose                                              |
+|------------------------|--------|------------------------------------------------------|
+| `poc.py`               | Create | Entire PoC script                                    |
+| `patch_onnx_dims.py`   | Create | One-time script to patch ONNX models with dynamic spatial axes |
+| `requirements.txt`     | Edit   | Add `dxcam`, `onnx`; change `onnxruntime` to `onnxruntime-gpu` |
 
 No changes to existing model code. Preprocessing is inlined to keep the PoC self-contained and decoupled from the single-image stylization utilities.
 
@@ -116,10 +119,14 @@ No changes to existing model code. Preprocessing is inlined to keep the PoC self
 
 ## Dependencies
 
-Only one new dependency beyond existing `requirements.txt`:
-- `dxcam`
+New dependencies beyond existing `requirements.txt`:
+- `dxcam` — screen capture
+- `onnx` — patching ONNX model dimension declarations
 
-Existing deps used: `onnxruntime`, `opencv-python`, `numpy`.
+Changed dependencies:
+- `onnxruntime` → `onnxruntime-gpu` — the base `onnxruntime` pip package does not include CUDA support; `onnxruntime-gpu` is required for `CUDAExecutionProvider`
+
+Existing deps used: `opencv-python`, `numpy`.
 
 ## Success Criteria
 
