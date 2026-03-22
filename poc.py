@@ -14,7 +14,6 @@ import os
 import time
 
 import cv2
-import dxcam
 import numpy as np
 import onnxruntime as ort
 
@@ -143,7 +142,8 @@ def main():
     current_style_idx = styles.index(args.style)
     scale = max(0.1, min(1.0, args.scale))
 
-    # Init DXcam
+    # Init DXcam (imported here to keep pure functions importable cross-platform)
+    import dxcam
     try:
         camera = dxcam.create(device_idx=0, output_idx=args.monitor, output_color="BGR")
     except Exception as e:
